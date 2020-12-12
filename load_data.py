@@ -40,13 +40,13 @@ class PreProcess:
 def execute_load_data():
     path_1 = "/Users/csatyajith/Datasets/ML_proj/wdi_data/wdi_ml_data_part_1.csv"
     path_2 = "/Users/csatyajith/Datasets/ML_proj/wdi_data/wdi_ml_data_part_1.csv"
-    storage_path = "merged_wdi_data.csv"
+    storage_path = "data/merged_wdi_data.csv"
     PreProcess.load_data(path_1, path_2, storage_path)
 
 
 def execute_transform():
     pp = PreProcess()
-    df = pd.read_csv("merged_wdi_data.csv")
+    df = pd.read_csv("data/merged_wdi_data.csv")
     pp.change_columns_to_source(df)
 
 
