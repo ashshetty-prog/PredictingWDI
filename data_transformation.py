@@ -36,7 +36,6 @@ def work1():
         engine='openpyxl',
         sheet_name="1990-1999 MetaData"
     )
-    good_columns = []
     best_cols = df.isna().sum().sort_values()
     best_cols = best_cols[best_cols.lt(5)]
     for key, value in best_cols.iteritems():
@@ -56,6 +55,7 @@ def work2():
     df = df[~df["Country Code"].isin(bad_countries)]
     print(df)
     df.to_csv("data/reduced_dataset_v3.csv", index=False)
+
 
 if __name__ == '__main__':
     work2()

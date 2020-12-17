@@ -12,6 +12,7 @@ from knn import KNN
 class StepByStepRegression:
     def __init__(self, df: pd.DataFrame, method):
         self.df = df
+        self.normalized_df = self.df.copy()
         self.sim_fun = method
         self.norm_constants = {}
 
@@ -21,7 +22,7 @@ class StepByStepRegression:
                 "min": self.df[col].min(),
                 "max": self.df[col].max()
             }
-            self.df[col] = (self.df[col] - self.norm_constants[col]["min"]) / (
+            self.normalized_df[col] = (self.df[col] - self.norm_constants[col]["min"]) / (
                     self.norm_constants[col]["max"] - self.norm_constants[col]["min"])
 
     def un_normalize(self):
@@ -56,7 +57,7 @@ class StepByStepRegression:
 
     def train_test_interpolate_split(self, df, col):
         non_null_df = df[~df[col].isnull()]
-        split_point = int(0.80 * non_null_df.shape[0])
+        split_point = int(0.95 * non_null_df.shape[0])
         null_df = df[df[col].isnull()]
         train_x = non_null_df.iloc[:split_point, non_null_df.columns != col]
         train_y = non_null_df.iloc[:split_point, non_null_df.columns == col]
@@ -65,6 +66,14 @@ class StepByStepRegression:
         interpolate_x = null_df.iloc[:, null_df.columns != col]
 
         return train_x, train_y, test_x, test_y, interpolate_x
+
+    def train_validation_split(self, x, y, train_size=0.90):
+        split_point = int(x.shape[0] * train_size)
+        train_x = x.iloc[:split_point]
+        valid_x = x.iloc[split_point:]
+        train_y = y.iloc[:split_point]
+        valid_y = y.iloc[split_point:]
+        return train_x, train_y, valid_x, valid_y
 
     def fill_missing_data_step_by_step(self, sorted_df):
         num_nans = sorted_df.isnull().sum()
@@ -76,15 +85,16 @@ class StepByStepRegression:
 
             accepted_cols.append(col)
             sorted_df_copy = sorted_df.copy()
-            print('feature', col)
+            print('\n \n \n feature', col)
             accepted_df = sorted_df_copy[accepted_cols]
 
             train_x, train_y, test_x, test_y, i_x = self.train_test_interpolate_split(accepted_df, col)
             model = LinearRegression()
             w_trained = model.simple_naive_regression(np.asarray(train_x), np.asarray(train_y))
-            print('trained weights', w_trained)
 
             err, y_pred = model.error_calculation(np.asarray(test_x), np.asarray(test_y), w_trained)
+            for k, pred in enumerate(y_pred):
+                print("Actual: {}, Predicted: {}".format(train_y.iloc[k].values[0], pred))
             print("RMS Error: ", err)
             # print('actual', test_y)
             # print('pred', y_pred)
@@ -92,8 +102,7 @@ class StepByStepRegression:
             for k, inter_x in i_x.iterrows():
                 sorted_df.at[k, col] = model.predict(np.asarray(inter_x), w_trained)
 
-    @staticmethod
-    def fill_missing_data(sorted_df, correlated_features):
+    def fill_missing_data(self, sorted_df, correlated_features):
         """
         To predict a feature X we find other features that are highly correlated with X. corr_feature_df is the subset
         of data with X and its correlated features.
@@ -111,7 +120,7 @@ class StepByStepRegression:
             sorted_df_copy = sorted_df.copy()
             print('feature', col)
             corr_feature_df = sorted_df_copy[correlated_features[col]]
-
+            train_data = corr_feature_df[~corr_feature_df[col].isnull()]
             test_data = corr_feature_df[corr_feature_df[col].isnull()]
             print('test data', test_data)
             if test_data.empty:
@@ -119,39 +128,42 @@ class StepByStepRegression:
             # corr_feature_df.dropna(inplace=True)
 
             # print(corr_feature_df)
-            y_train = corr_feature_df[col]
+            y_train = train_data[col]
             y_train = y_train.fillna(y_train.mean())
 
-            X_train = corr_feature_df.drop(col, axis=1)
+            X_train = train_data.drop(col, axis=1)
             X_train = X_train.fillna(X_train.mean())
             # print('X train', X_train[:5])
-
+            train_x, train_y, validation_x, validation_y = self.train_validation_split(X_train, y_train)
+            v_x = np.asarray(validation_x)
+            v_y = np.asarray(validation_y)
             X_test = test_data.drop(col, axis=1)
 
             # X_test.dropna(inplace=True)
             X_test = X_test.fillna(X_train.mean())
             # print('X test', X_test)
-
             # model = sklm.LinearRegression()
             model = LinearRegression()
             # model.fit(X_train, y_train)
-            X = np.asarray(X_train)
+            X = np.asarray(train_x)
             # fetches last column data
-            y = np.asarray(y_train)
+            y = np.asarray(train_y)
             w_trained = model.simple_naive_regression(X, y)
-            print('trained weights', w_trained)
+            # print('trained weights', w_trained)
 
             # Training accuracy
             # print('accuracy', model.score(X_train, y_train))
 
             # y_pred = model.predict(X_test)
-            err, y_pred = model.error_calculation(X, y, w_trained)
+            err, y_pred = model.error_calculation(v_x, v_y, w_trained)
             print("RMS Error: ", err)
-            print('actual', y)
-            print('pred', y_pred)
+            for k in range(len(v_y)):
+                if k % 10 == 0:
+                    print("Actual: {}, Predicted: {}".format(v_y[k], y_pred[k]))
             # print('test data predictions', np.dot(X_test, w_trained))
-            for c, r in enumerate(test_data.index.values):
-                sorted_df.at[r, col] = y_pred[c]
+
+            for k, inter_x in X_test.iterrows():
+                sorted_df.at[k, col] = model.predict(np.asarray(inter_x), w_trained)
 
 
 def execute():
@@ -163,12 +175,12 @@ def execute():
     sbs_reg.normalize()
     # print(normalized_df.head())
 
-    sorted_columns = sbs_reg.get_least_nan_columns(sbs_reg.df)
+    sorted_columns = sbs_reg.get_least_nan_columns(sbs_reg.normalized_df)
     # print('sorted columns', sorted_columns)
     sorted_df = pd.DataFrame()
     correlated_features_list = dict()
     for col, nulls in sorted_columns.iteritems():
-        sorted_df[col] = sbs_reg.df[col]
+        sorted_df[col] = sbs_reg.normalized_df[col]
     # print('sorted dataframe', sorted_df.columns)
 
     if sbs_reg.sim_fun == 'KNN':
@@ -187,14 +199,14 @@ def execute_2():
     sbs_reg = StepByStepRegression(df, 'correlation')
 
     sbs_reg.normalize()
-    sorted_columns = sbs_reg.get_least_nan_columns(sbs_reg.df)
+    sorted_columns = sbs_reg.get_least_nan_columns(sbs_reg.normalized_df)
     sorted_df = pd.DataFrame()
     for col, nulls in sorted_columns.iteritems():
-        sorted_df[col] = sbs_reg.df[col]
+        sorted_df[col] = sbs_reg.normalized_df[col]
     sbs_reg.fill_missing_data_step_by_step(sorted_df)
     sbs_reg.un_normalize()
-    print(sbs_reg.df)
+    print(sbs_reg.normalized_df)
 
 
 if __name__ == '__main__':
-    execute_2()
+    execute()

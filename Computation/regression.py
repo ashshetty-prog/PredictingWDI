@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from Computation.data import create_dataset
+from Computation.data_creation import create_dataset
 
 
 class LinearRegression:
