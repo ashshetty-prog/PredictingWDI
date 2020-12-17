@@ -160,15 +160,15 @@ def execute():
     df = df.drop(['Unnamed: 0', 'Time', 'Time Code', 'Country Name', 'Country Code'], axis=1)
     sbs_reg = StepByStepRegression(df, 'correlation')
     # print(emp_df.columns)
-    normalized_df = sbs_reg.normalize()
+    sbs_reg.normalize()
     # print(normalized_df.head())
 
-    sorted_columns = sbs_reg.get_least_nan_columns(normalized_df)
+    sorted_columns = sbs_reg.get_least_nan_columns(sbs_reg.df)
     # print('sorted columns', sorted_columns)
     sorted_df = pd.DataFrame()
     correlated_features_list = dict()
     for col, nulls in sorted_columns.iteritems():
-        sorted_df[col] = normalized_df[col]
+        sorted_df[col] = sbs_reg.df[col]
     # print('sorted dataframe', sorted_df.columns)
 
     if sbs_reg.sim_fun == 'KNN':
@@ -194,6 +194,7 @@ def execute_2():
     sbs_reg.fill_missing_data_step_by_step(sorted_df)
     sbs_reg.un_normalize()
     print(sbs_reg.df)
+
 
 if __name__ == '__main__':
     execute_2()
