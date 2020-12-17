@@ -25,10 +25,11 @@ class StepByStepRegression:
             self.normalized_df[col] = (self.df[col] - self.norm_constants[col]["min"]) / (
                     self.norm_constants[col]["max"] - self.norm_constants[col]["min"])
 
-    def un_normalize(self):
-        for col in self.df.columns:
-            self.df[col] = self.df[col] * (self.norm_constants[col]["max"] - self.norm_constants[col]["min"]) + \
+    def un_normalize(self, df):
+        for col in df.columns:
+            df[col] = df[col] * (self.norm_constants[col]["max"] - self.norm_constants[col]["min"]) + \
                            self.norm_constants[col]["min"]
+        return df
 
     # Compute correlation matrix. Only select subset of features with a correlation above threshold.
     @staticmethod
@@ -190,6 +191,8 @@ def execute():
         correlated_features_list = sbs_reg.correlation(sorted_df)
     print('correlated features', correlated_features_list)
     sbs_reg.fill_missing_data(sorted_df, correlated_features_list)
+    un_normalized = sbs_reg.un_normalize(sorted_df)
+    print(un_normalized)
     # %%
 
 
@@ -204,8 +207,8 @@ def execute_2():
     for col, nulls in sorted_columns.iteritems():
         sorted_df[col] = sbs_reg.normalized_df[col]
     sbs_reg.fill_missing_data_step_by_step(sorted_df)
-    sbs_reg.un_normalize()
-    print(sbs_reg.normalized_df)
+    un_normalized = sbs_reg.un_normalize(sorted_df)
+    print(un_normalized)
 
 
 if __name__ == '__main__':
